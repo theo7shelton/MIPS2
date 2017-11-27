@@ -5,8 +5,11 @@
 
 						# Data declaration 	
 
-invalid_inputStr:					# If invalid input, programs outputs this string
+string_NaN:					# If invalid input, programs outputs this string
 	.asciiz "NaN"
+string_tooLarge:
+	.asciiz "too large"
+
 buffer:							# Reserved space in memory for user input
 	.space 1001
 validCharacters:					# Reserved space in memory for valid characters in user input
@@ -103,10 +106,12 @@ endCheckComma:
 		addi $sp, $sp, -9				# Enough space for 8 characters 
 		
 	noInputBeforeComma:
+		li $t1, 0
 		addi $sp, $sp, -1
-		sb 0, 0($sp)
+		sb $t1, 0($sp)
 		jal subprogram_3
-
+		# addi $sp, $sp, 1
+		j inputLoop					# jump to next string
 endInputLoop:
 	beqz $t8, 
 	
@@ -124,14 +129,40 @@ subprogram_1:						# hexToDec
 subprogram_2: 						# convertString
 
 
+
 subprogram_3:						# displayResult:
 	
 		# Take first single byte from stack, if 1 then should display value passed in stack. 
 		# If zero, jump to invalid and display invalid_string "NaN"
+	lbu $t0, 0($sp)					# Check first byte of stack, if 1, print NaN, if 2 Too large, if 0
+	beq $t0, 2, tooLarge
+	beq $t0, 1, notANumber
+	lw $t0, 1($sp) 					# Move 4 byte long number to $t0
+	bgez $t0, showInt				# If number is positive, show integer
+	li $t1, 10					
+	divu $t0, $t1					# Divide number by 10
+	mflo $t0					# Store quotient in $s0
+	mfhi $t1					# Store remainder in $s1
+     showInt:
+	li $v0, 1					# Load print integer call code
+	move $a0, $t0					# Load integer into $a0	
+	syscall						# Print integer (if div occurred, print quotient)
+	bgez $t0, returnToMain				# End function if no need to show remainder that is in $s1
+	move $a0, $t1					# Put remainder in $a0
+	syscall						# Print remainder
+	jr $ra						# Return to main
+     tooLarge:
+	li $v0, 4
+	la $a0, string_tooLarge
+	syscall
+	jr $ra
+     notANumber: 
+	li $v0, 4				# load print string call code
+	la $a0, string_NaN			# Print error message
+	syscall					# print buffer string
+	returnToMain: 
+		jr $ra
+	
+
  
-	invalid: 
-		li $v0, 4					# load print string call code
-		la $a0, invalid_inputStr			# Print error message
-		syscall						# print buffer string
-		jr $ra 						# return	
 	
