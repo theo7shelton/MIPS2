@@ -9,6 +9,8 @@ string_NaN:					# If invalid input, programs outputs this string
 	.asciiz "NaN"
 string_tooLarge:
 	.asciiz "too large"
+char_comma:
+	.asciiz ","
 
 buffer:							# Reserved space in memory for user input
 	.space 1001
@@ -27,6 +29,7 @@ main:							# Begin main code
 	li $a1, 1001					# define amount of characters to be read
 	syscall						# system call for keyboard input
 	li $s1, 0					# Initialize register for use
+	sub $s7, $a0, 1					# Stores address of byte before string buffer
 	
      		# Loop until endcharacter (carriage return or end of line or COMMA*)
 inputLoop:
@@ -34,21 +37,29 @@ inputLoop:
 	li $t9, 0					
 	li $t8, 0					# Counts amount of valid characters in string
 	la $t7, validCharacters				# Load address in memory to store valid characters
-	li $t6, 0					# counts amount of characters
-	
-	
+    
+     resetArray:
+	sb $t9, 0($t7)					# Reset array to 0000000000000000
+	sb $t9, 1($t7)
+	sb $t9, 2($t7)
+	sb $t9, 3($t7)
+	sb $t9, 4($t7)
+	sb $t9, 5($t7)
+	sb $t9, 6($t7)
+	sb $t9, 7($t7)
+
 	checkString: 				# Checks to see if string is valid. If not, branches to code to display error message to user=
 
 		# If comma, jump to subprogram_3 and pass amt of valid characters in stack
-
-		lb $t0, 0($a0)					# Load byte into $t0
+		addi $s7, $s7, 1
+		lb $t0, 0($s7)					# Load byte into $t0
 
 		li $t1, 44					# ASCII Decimal for comma
-		beq $t0, $t1, endCheck 				# Check if byte is comma
+		beq $t0, $t1, endCheckComma			# Check if byte is comma
 
-		beqz $t0, endCheck				# Check if current character is end of line character, if so end checkString
+		beqz $t0, endInputLoop				# Check if current character is end of line character, if so end checkString
 		li $t1, 10					# Load return carriage decimal into $t1
-		beq $t0, $t1, endCheck				# End checkString if current character is carriage return
+		beq $t0, $t1, endInputLoop			# End checkString if current character is carriage return
 
 		li $t1, 0x00000020				# Load space character in $t1
 		bne $t1, $t0, notASpace				# Check if current character is a space, if not branch to notASpace
@@ -86,34 +97,57 @@ inputLoop:
 		beqz $s1, invalid				# If no valid characters, branch to invalid
 			# If valid, do the following
 		addiu $t8, $t8, 1				# Keep track of valid character entries 
+		bgt $t8, 9, tooManyChars			# Leave loop string is greater than 8 valid characters
 		sb $t0, 0($t7)					# Move valid character into validCharacter array
 		addiu $t7, $t7, 1				# Put address of next byte of validCharacter array in $t7
-     		addiu $a0, $a0, 1				# Put address of next byte of input string in $a0
+     		addiu $s7, $s7, 1				# Put address of next byte of input string in $a0
 		li $s1, 0					# Reset these registers
 		li $s0, 0
 
 		j checkString					# Loop back to checkString
 		
-# First check each character in a single word
+		# First check each character in a single word
 		# If characters are valid, call convertString to convert single string and call displayResult to display the result
 		# loop function
 endCheckComma:
 	
 	beqz $t8, noInputBeforeComma				# If no valid characters entered, input is invalid
-	
-	valid: 
+	# valid: 
 		# Call sub
 		addi $sp, $sp, -9				# Enough space for 8 characters 
 		
+		j goToLoop
+
 	noInputBeforeComma:
-		li $t1, 0
+		li $t1, 1
 		addi $sp, $sp, -1
 		sb $t1, 0($sp)
 		jal subprogram_3
-		# addi $sp, $sp, 1
-		j inputLoop					# jump to next string
+		addi $sp, $sp, 1
+		j  goToLoop
+tooManyChars:
+	li $t1, 2
+	addi $sp, $sp, -1
+	sb $t1, 0($sp)
+	jal subprogram_3
+	addi $sp, $sp, 1
+
+goToLoop:
+	li $v0, 4				# load print string call code
+	la $a0, char_comma			# Print comma
+	syscall					# print buffer string
+	j inputLoop
+
 endInputLoop:
-	beqz $t8, 
+	beqz $t8, noInput
+	valid:
+	
+	noInput:
+	li $t1, 1
+	addi $sp, $sp, -1
+	sb $t1, 0($sp)
+	jal subprogram_3
+	addi $sp, $sp, 1	
 	
 endFunc:
 	li $v0, 10
@@ -150,19 +184,19 @@ subprogram_3:						# displayResult:
 	bgez $t0, returnToMain				# End function if no need to show remainder that is in $s1
 	move $a0, $t1					# Put remainder in $a0
 	syscall						# Print remainder
-	jr $ra						# Return to main
+	j returnToMain					# Return to main
      tooLarge:
 	li $v0, 4
 	la $a0, string_tooLarge
 	syscall
-	jr $ra
+	j returnToMain
      notANumber: 
 	li $v0, 4				# load print string call code
 	la $a0, string_NaN			# Print error message
 	syscall					# print buffer string
+
 	returnToMain: 
 		jr $ra
-	
 
  
 	
