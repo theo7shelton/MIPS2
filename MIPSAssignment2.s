@@ -14,8 +14,6 @@ char_comma:
 
 buffer:							# Reserved space in memory for user input
 	.space 1001
-validCharacters:					# Reserved space in memory for valid characters in user input
-	.space 8
 
 	.text
 
@@ -38,69 +36,12 @@ inputLoop:
 	li $t8, 0					# Counts amount of valid characters in string
 	la $t7, validCharacters				# Load address in memory to store valid characters
     
-     resetArray:
-	sb $t9, 0($t7)					# Reset array to 0000000000000000
-	sb $t9, 1($t7)
-	sb $t9, 2($t7)
-	sb $t9, 3($t7)
-	sb $t9, 4($t7)
-	sb $t9, 5($t7)
-	sb $t9, 6($t7)
-	sb $t9, 7($t7)
 
-	checkString: 				# Checks to see if string is valid. If not, branches to code to display error message to user=
 
-		# If comma, jump to subprogram_3 and pass amt of valid characters in stack
-		addi $s7, $s7, 1
-		lb $t0, 0($s7)					# Load byte into $t0
-
-		li $t1, 44					# ASCII Decimal for comma
-		beq $t0, $t1, endCheckComma			# Check if byte is comma
-
-		beqz $t0, endInputLoop				# Check if current character is end of line character, if so end checkString
-		li $t1, 10					# Load return carriage decimal into $t1
-		beq $t0, $t1, endInputLoop			# End checkString if current character is carriage return
-
-		li $t1, 0x00000020				# Load space character in $t1
-		bne $t1, $t0, notASpace				# Check if current character is a space, if not branch to notASpace
-      	spaceCheck:					# If current character is a space, check where the space is and if the input string is invalid
-		addiu $a0, $a0, 1				# Put address of next byte of input string in $a0
-		beqz $t8, checkString				# check if there was a valid character before the space, if not ignore space
-		addiu $t9, $t9, 1				# Record space following valid character entry
-		j checkString					# Loop back to checkString
-	
-   	  notASpace:
-		 bne $t9, $zero, endCheckComma			# Check if there was a sequence of character, any amount of spaces, then a character. If so branch to invalid
-			# Check if in range of 0-9 ASCII		
-		li $t1, 0x0000003A
-		slt $t2, $t0, $t1				# Sets $t2 if t0 <3Ah
-		li $t1, 0x0000002F				
-		slt $t3, $t1, $t0				# Sets $t3 if $t0 > 2Fh
-		and $s0, $t2, $t3				# Sets $s0 if byte is in range of 0-9 ASCII 
-		addu $s1, $s1, $s0				# If falls in the range, increments $s1
-			# Check if byte has code for ASCII a-f 
-		li $t1, 0x00000067
-		slt $t2, $t0, $t1				# Sets $t2 if t0 < 67
-		li $t1, 0x00000060				
-		slt $t3, $t1, $t0				# Sets $t3 if $t0 > 60
-		and $s0, $t2, $t3				# Sets $s0 if byte is in range of a-f ASCII 
-		addu $s1, $s1, $s0				# If falls in the range, increments $s1
-
-			# Check if byte has code for ASCII A-F
-		li $t1, 0x00000047
-		slt $t2, $t0, $t1				# Sets $t2 if t0 < 47
-		li $t1, 0x00000040				
-		slt $t3, $t1, $t0				# Sets $t3 if $t0 > 40
-		and $s0, $t2, $t3				# Sets $s0 if byte is in range of A-F ASCII 
-		addu $s1, $s1, $s0				# If falls in the range, increments $s1
-	
-		beqz $s1, invalid				# If no valid characters, branch to invalid
-			# If valid, do the following
 		addiu $t8, $t8, 1				# Keep track of valid character entries 
 		bgt $t8, 9, tooManyChars			# Leave loop string is greater than 8 valid characters
 		sb $t0, 0($t7)					# Move valid character into validCharacter array
 		addiu $t7, $t7, 1				# Put address of next byte of validCharacter array in $t7
-     		addiu $s7, $s7, 1				# Put address of next byte of input string in $a0
 		li $s1, 0					# Reset these registers
 		li $s0, 0
 
@@ -111,14 +52,14 @@ inputLoop:
 		# loop function
 endCheckComma:
 	
-	beqz $t8, noInputBeforeComma				# If no valid characters entered, input is invalid
+	beqz $t8, inputInvalid				# If no valid characters entered, input is invalid
 	# valid: 
 		# Call sub
 		addi $sp, $sp, -9				# Enough space for 8 characters 
 		
 		j goToLoop
 
-	noInputBeforeComma:
+	inputInvalid:
 		li $t1, 1
 		addi $sp, $sp, -1
 		sb $t1, 0($sp)
@@ -159,10 +100,105 @@ endFunc:
 
 subprogram_1:						# hexToDec
 	
+	li $s0, 0					# Reset these registers
+	li $s1, 0				
+
+     checkChar:
+	li $t1, 0x0000003A
+	slt $t2, $a0, $t1				# Sets $t2 if t0 <3Ah
+	li $t1, 0x0000002F				
+	slt $t3, $t1, $a0				# Sets $t3 if $t0 > 2Fh
+	and $s0, $t2, $t3				# Sets $s0 if byte is in range of 0-9 ASCII 
+	addu $s1, $s1, $s0				# If falls in the range, increments $s1
+	bne $s1, 1, checkAThroughF
+    	li $v0, 2					# Set to 2 to show that inputted character is valid
+	subu $v1, $t2, 48
+	jr $ra
+	
+     checkAThroughF:					# Check if byte has code for ASCII A-F
+	li $t1, 0x00000047
+	slt $t2, $a0, $t1				# Sets $t2 if t0 < 47
+	li $t1, 0x00000040				
+	slt $t3, $t1, $t0				# Sets $t3 if $t0 > 40
+	and $s0, $t2, $t3				# Sets $s0 if byte is in range of A-F ASCII 
+	addu $s1, $s1, $s0				# If falls in the range, increments $s1
+	bne $s1, 1, aThroughfCheck
+	li $v0, 2					# Set to 2 to show that inputted character is valid
+	subu $v1, $t2, 55
+	jr $ra
+	
+     aThroughfCheck:		# Check if byte has code for ASCII a-f 
+	li $t1, 0x00000067
+	slt $t2, $a0, $t1				# Sets $t2 if t0 < 67
+	li $t1, 0x00000060				
+	slt $t3, $t1, $a0				# Sets $t3 if $t0 > 60
+	and $s0, $t2, $t3				# Sets $s0 if byte is in range of a-f ASCII 
+	addu $s1, $s1, $s0				# If falls in the range, increments $s1
+	bne $s1, 1, invalidInput
+	li $v0, 2					# Set to 2 to show that inputted character is valid
+	subu $v1, $t2, 87
+	jr $ra
+
+     invalidInput:
+	li $v0, 1					# Set $v0 to 3 if NaN
+	jr $ra		
 
 subprogram_2: 						# convertString
-
-
+	move $t0, $a0					# Address is in $a0
+	li $t6, 0
+	li $t7, 2					# If valid string, $t7=2
+	li $t8, 0					# Count good characters
+	li $t9, 0					# Count space after valid character
+	move $s7, $ra					# Save return address to $s7
+	li $s6, 0					# Store integer
+     loop:
+	lb $a1, 0($t0)					# Load current to $a1
+	beq $a1, 44, exitLoop
+	beqz $a1, endProgram				# Check if current character is end of line character, if so end checkString					
+	beq $a1, 10, endProgram				# End checkString if current character is carriage return
+	bne $a1, 32, notASpace				# Check if current character is a space, if not branch to notASpace
+	bne $a1, 9, notASpace				# Check if tab, if not branch to notASpace
+      spaceCheck:					# If current character is a space, check where the space is and if the input string is invalid
+	addiu $t0, $t0, 1				# Put address of next byte of input string in $a0
+	beqz $t8, loop					# check if there was a valid character before the space, if not ignore space
+	addiu $t9, $t9, 1				# Record space following valid character entry
+	j loop						# Loop back to checkString
+	
+     notASpace:
+	bne $t9, $zero, setNaN				# Check if there was a sequence of character, any amount of spaces, then a character. If so branch to invalid
+	jal subprogram_1				# Call subprogram_1 to figure out decimal
+	beq $v0, 1, setNaN
+	sll $s6, $s6, 1
+	addu $s6, $s6, $v1
+	addi $t8, $t8, 1
+     setNaN:
+	li $t7, 1
+	j jumpToLoop
+     jumpToLoop:
+	addiu $t0, $t0, 1
+	j loop
+    setEndProgram:
+	beq $a1, 44, exitLoop
+    endProgram:
+	li $t6, 1
+    exitLoop:
+	beq $t7, 1, exitFunc
+	bge $t8, 9, setTooLarge
+	beqz $t8, setNoInput
+	j exitFunc
+    setTooLarge:
+	li $t7, 0
+	j exitFunc
+    setNoInput
+	li $t7, 1
+    exitFunc: 
+	addi $sp, $sp, -6
+	sb $t7, 0($sp)
+	sb $t6, 1($sp)
+	sw $s6, 2($sp)
+	move $ra, $s7
+	jr $ra
+	
 
 subprogram_3:						# displayResult:
 	
@@ -199,4 +235,9 @@ subprogram_3:						# displayResult:
 		jr $ra
 
  
+	# ONLY EXIT checkString on commas, NL, or Carriage Return
+	# Record comma position and starting position
+	# if comma
+	# check difference between starting and comma position. if greater than 8> display 
+	
 	
